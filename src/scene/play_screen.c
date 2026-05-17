@@ -66,6 +66,7 @@ void start_play_screen(void *data) {
     can_quick_solve = false;
     solved = false;
     started = true;
+    state->snapshot.valid = false;
     state->game_start = furi_get_tick();
 }
 
@@ -93,6 +94,65 @@ bool is_picked_from(uint8_t x, uint8_t y) {
 void set_picked_from(int8_t x, int8_t y) {
     picked_from[0] = x;
     picked_from[1] = y;
+}
+
+static void collect_piles(GameState *state, List **piles) {
+    piles[0] = state->deck;
+    piles[1] = state->waste;
+    piles[2] = state->hand;
+    for (uint8_t i = 0; i < 4; i++) piles[3 + i] = state->foundation[i];
+    for (uint8_t i = 0; i < 7; i++) piles[7 + i] = state->tableau[i];
+}
+
+static void save_snapshot(GameState *state) {
+    List *piles[SNAPSHOT_PILE_COUNT];
+    collect_piles(state, piles);
+
+    uint8_t idx = 0;
+    for (uint8_t p = 0; p < SNAPSHOT_PILE_COUNT; p++) {
+        state->snapshot.pile_sizes[p] = piles[p]->count;
+        ListItem *curr = piles[p]->head;
+        while (curr && idx < 52) {
+            Card *c = (Card *) curr->data;
+            state->snapshot.cards[idx] = c;
+            state->snapshot.exposed[idx] = c->exposed;
+            idx++;
+            curr = curr->next;
+        }
+    }
+    state->snapshot.picked_from[0] = picked_from[0];
+    state->snapshot.picked_from[1] = picked_from[1];
+    state->snapshot.valid = true;
+}
+
+static void undo(GameState *state) {
+    if (!state->snapshot.valid) {
+        notification_message(state->notification_app, &sequence_fail);
+        return;
+    }
+
+    List *piles[SNAPSHOT_PILE_COUNT];
+    collect_piles(state, piles);
+
+    for (uint8_t p = 0; p < SNAPSHOT_PILE_COUNT; p++) {
+        list_clear(piles[p]);
+    }
+
+    uint8_t idx = 0;
+    for (uint8_t p = 0; p < SNAPSHOT_PILE_COUNT; p++) {
+        for (uint8_t i = 0; i < state->snapshot.pile_sizes[p]; i++) {
+            Card *c = state->snapshot.cards[idx];
+            c->exposed = state->snapshot.exposed[idx];
+            list_push_back(c, piles[p]);
+            idx++;
+        }
+    }
+
+    picked_from[0] = state->snapshot.picked_from[0];
+    picked_from[1] = state->snapshot.picked_from[1];
+    state->snapshot.valid = false;
+    state->selected_card = 1;
+    check_quick_solve(state);
 }
 
 void render_play_screen(void *data) {
@@ -201,11 +261,13 @@ void input_play_screen(void *data, InputKey key, InputType type) {
                 if (state->selected[0] == 0 && state->selected[1] == 0) {
                     if(state->deck->count > 0 || state->waste->count > 0) {
                         if (state->deck->count > 0) {
+                            save_snapshot(state);
                             Card *c = list_pop_back(state->deck);
                             c->exposed = true;
                             list_push_back(c, state->waste);
                             return;
                         } else {
+                            save_snapshot(state);
                             while (state->waste->count) {
                                 Card *c = list_pop_back(state->waste);
                                 c->exposed = false;
@@ -218,6 +280,7 @@ void input_play_screen(void *data, InputKey key, InputType type) {
                 } else if (state->selected[0] == 1 && state->selected[1] == 0) {
                     //pick from waste
                     if (state->hand->count == 0 && state->waste->count > 0) {
+                        save_snapshot(state);
                         list_push_back(list_pop_back(state->waste), state->hand);
                         set_picked_from(1, 0);
                         return;
@@ -247,12 +310,14 @@ void input_play_screen(void *data, InputKey key, InputType type) {
                         if(last) {
                             //Flip card if not exposed
                             if (!last->exposed) {
+                                save_snapshot(state);
                                 last->exposed = true;
                                 check_quick_solve(state);
                                 return;
                             }
                                 //Pick cards
                             else {
+                                save_snapshot(state);
                                 for (uint8_t i = 0; i < state->selected_card && tbl->count > 0; i++) {
                                     list_push_front(list_pop_back(tbl), state->hand);
                                 }
@@ -285,6 +350,9 @@ void input_play_screen(void *data, InputKey key, InputType type) {
                     }
                 }
                 break;
+            case InputKeyBack:
+                undo(state);
+                return;
             default:
                 return;
         }

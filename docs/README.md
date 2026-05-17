@@ -13,6 +13,7 @@ Solitaire, the classic Klondike version, now available on your Flipper Zero.
 
 * **Long Press Any Arrow:** Jump to the furthest point in that direction.
 * **Long Press Center:** Automatically place the card in the top right section.
+* **Short Press Back:** Undo the last move.
 * **Long Press Back:** Close the application instantly.
 
 ## Rules

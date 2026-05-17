@@ -14,6 +14,16 @@ typedef struct {
     Vector velocity;
 } AnimatedCard;
 
+#define SNAPSHOT_PILE_COUNT 14
+
+typedef struct {
+    Card *cards[52];
+    bool exposed[52];
+    uint8_t pile_sizes[SNAPSHOT_PILE_COUNT];
+    int8_t picked_from[2];
+    bool valid;
+} GameSnapshot;
+
 typedef struct {
     Canvas *canvas;
     Gui *gui;
@@ -39,6 +49,8 @@ typedef struct {
     double delta_time;
     size_t game_start;
     size_t game_end;
+
+    GameSnapshot snapshot;
 
 } GameState;
 

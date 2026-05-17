@@ -1,3 +1,7 @@
+## v2.1.0
+
+- Added undo for the last move (short press Back)
+
 ## v2.0.2
 
 - Fixed cards from waste can be placed on the first tableau
