@@ -1,3 +1,8 @@
+## v2.1.1
+
+- Rebuilt and verified against Flipper firmware 1.5.1 (API 88.2)
+
+
 ## v2.1.0
 
 - Added undo for the last move (short press Back)
